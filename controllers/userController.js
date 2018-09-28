@@ -23,9 +23,5 @@ module.exports = {
     const username = object.username;
     delete object.username;
     ctx.status = await modify(username, object);
-  },
-  refresh: async function (ctx) {
-    const object = JSON.parse(ctx.request.body);
-    const username = object.username;
   }
 };

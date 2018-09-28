@@ -20,7 +20,5 @@ router.get('/api/playlists/recent', playlists.recent);
 // user methods
 router.get('/api/me', user.get);
 router.put('/api/me', user.modify);
-//PENDING REFRESH ROUTE!
-router.get('/api/me/refresh', user.refresh);
 
 module.exports = router;
