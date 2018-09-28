@@ -15,7 +15,6 @@
     "koa-body-parser": "^1.1.2",
     "koa-cors": "0.0.16",
     "koa-router": "^7.3.0",
-    "koa-static": "^4.0.1",
     "mongodb": "^2.2.33",
     "redis": "^2.8.0",
     "shortid": "^2.2.8",
