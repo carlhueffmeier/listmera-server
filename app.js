@@ -7,7 +7,7 @@ const cors = require('koa-cors');
 require('dotenv').config();
 
 const options = {
-  origin: 'http://listmera.rocks',
+  origin: process.env.CLIENT_URL,
 }
 
 app.use(bodyParser())
@@ -15,4 +15,5 @@ app.use(bodyParser())
   .use(router.routes())
   .use(router.allowedMethods())
 
-app.listen(process.env.PORT || 3000)
+  
+app.listen(process.env.PORT || 5555);
