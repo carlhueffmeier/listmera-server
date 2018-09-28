@@ -1,13 +1,24 @@
 {
   "name": "listmera-server",
   "version": "1.0.0",
-  "description": "",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon app.js",
+    "test": "jest",
+    "lint": "eslint --fix"
   },
-  "author": "",
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged && npm test"
+    }
+  },
+  "lint-staged": {
+    "*.js": [
+      "npm run lint",
+      "git add"
+    ]
+  },
   "license": "ISC",
   "dependencies": {
     "dotenv": "^4.0.0",
@@ -19,5 +30,15 @@
     "redis": "^2.8.0",
     "shortid": "^2.2.8",
     "spotify-web-api-node": "^2.5.0"
+  },
+  "devDependencies": {
+    "eslint": "^5.6.0",
+    "eslint-config-prettier": "^3.1.0",
+    "eslint-plugin-prettier": "^2.7.0",
+    "husky": "^1.0.1",
+    "jest": "^23.6.0",
+    "lint-staged": "^7.3.0",
+    "nodemon": "^1.18.4",
+    "prettier": "^1.14.3"
   }
 }
