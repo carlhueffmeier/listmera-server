@@ -1,4 +1,5 @@
 const spotify = require('../../secrets/spotifyConf.js');
+const { chunk, concatAll } = require('../../lib/utils');
 
 async function getFeatures(tracks, refresh) {
   await spotify.setRefreshToken(refresh);
@@ -8,7 +9,13 @@ async function getFeatures(tracks, refresh) {
       await spotify.setAccessToken(data.body['access_token']);
     })
     .catch(e => console.error(e));
-  return spotify.getAudioFeaturesForTracks([...tracks]);
+
+  // Get audio features in groups of 40 to make sure we are below the maximum
+  // URL length of 2083 characters
+  const chunkedResponse = await Promise.all(
+    chunk(tracks, 40).map(spotify.getAudioFeaturesForTracks)
+  );
+  return concatAll(chunkedResponse);
 }
 
 module.exports = getFeatures;
