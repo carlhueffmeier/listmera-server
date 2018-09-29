@@ -5,9 +5,7 @@ async function removeAdmin(object) {
   const db = await mongo;
   const user = await locate(object.username);
   const lists = user[0].adminOf.filter(el => el !== object.id);
-  await db.collection('users').update(
-    { username: object.username },
-    { $set: { adminOf: lists } });
+  await db.collection('users').update({ username: object.username }, { $set: { adminOf: lists } });
   return 202;
 }
 

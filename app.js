@@ -15,4 +15,4 @@ app
   .use(router.routes())
   .use(router.allowedMethods());
 
-app.listen(process.env.PORT || 5555);
+app.listen(process.env.PORT);

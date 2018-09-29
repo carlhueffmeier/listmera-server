@@ -9,7 +9,7 @@ client.on('error', err => {
   console.error(err);
 });
 
-client.on('connect', msg => {
+client.on('connect', () => {
   console.log('REDIS LIVE');
 });
 

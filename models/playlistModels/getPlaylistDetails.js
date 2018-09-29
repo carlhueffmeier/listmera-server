@@ -13,21 +13,43 @@ async function getFullPlaylist(id) {
       playlist.name = details.name;
       playlist.trackId = details.tracks;
       playlist.strict = Number(details.strict);
-      if (details.dance) playlist.dance = details.dance;
-      if (details.energy) playlist.energy = details.energy;
-      if (details.loud) playlist.loud = details.loud;
-      if (details.instrumental) playlist.instrumental = details.instrumental;
-      if (details.live) playlist.live = details.live;
-      if (Number(details.mood)) playlist.mood = Number(details.mood);
-      if (Number(details.mood) === 0) playlist.mood = Number(details.mood);
-      if (details.major) playlist.major = details.major;
-      if (details.minor) playlist.minor = details.minor;
-      if (err) reject(err);
+      if (details.dance) {
+        playlist.dance = details.dance;
+      }
+      if (details.energy) {
+        playlist.energy = details.energy;
+      }
+      if (details.loud) {
+        playlist.loud = details.loud;
+      }
+      if (details.instrumental) {
+        playlist.instrumental = details.instrumental;
+      }
+      if (details.live) {
+        playlist.live = details.live;
+      }
+      if (Number(details.mood)) {
+        playlist.mood = Number(details.mood);
+      }
+      if (Number(details.mood) === 0) {
+        playlist.mood = Number(details.mood);
+      }
+      if (details.major) {
+        playlist.major = details.major;
+      }
+      if (details.minor) {
+        playlist.minor = details.minor;
+      }
+      if (err) {
+        reject(err);
+      }
       client.smembers(`tracks:${details.tracks}`, async (err, reply) => {
         playlist.tracks = reply;
         resolve(playlist);
-        if (err) reject(err);
-      })
+        if (err) {
+          reject(err);
+        }
+      });
     });
   });
 }

@@ -1,5 +1,4 @@
 const client = require('./redis.js');
-const uuid = require('shortid');
 
 async function createPlaylist(object) {
   await client.del(`playlist:${object.playlist}`);

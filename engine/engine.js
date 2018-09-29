@@ -1,11 +1,11 @@
 module.exports = {
-  init (playlists) {
+  init(playlists) {
     return playlists
       .filter(el => el !== null)
       .map(el => el.tracks)
-      .reduce((prev, curr) => prev.concat(curr))
+      .reduce((prev, curr) => prev.concat(curr));
   },
-  match (features, source) {
+  match(features, source) {
     return features
       .filter(el => {
         if (source.dance) {
@@ -64,14 +64,14 @@ module.exports = {
       })
       .filter(el => {
         if (source.tempo) {
-          return (el.tempo >= (source.tempo - 15)) || (el.tempo <= (source.tempo + 15));
+          return el.tempo >= source.tempo - 15 || el.tempo <= source.tempo + 15;
         } else {
           return true;
         }
       })
       .map(el => el.id);
   },
-  parse (values, tempo) {
+  parse(values, tempo) {
     const res = {};
     if (~values.indexOf('Strict')) {
       res.strict = 1;
@@ -123,10 +123,10 @@ module.exports = {
       res.minor = '';
     }
     if (Number(tempo) === 50) {
-      res.tempo = ''
+      res.tempo = '';
     } else {
-      res.tempo = (1+((tempo-50)/100))*120;
+      res.tempo = (1 + (tempo - 50) / 100) * 120;
     }
     return res;
   }
-}
+};

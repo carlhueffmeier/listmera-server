@@ -7,15 +7,18 @@ if (process.env.MONGODB_URI) {
   url = 'mongodb://localhost:27017/listmera';
 }
 
-
-
 function database() {
   return new Promise((resolve, reject) => {
-    MongoClient.connect(url, (err, db) => {
-      if (err) reject(err);
-      console.log('MONGO LIVE');
-      resolve(db);
-    });
+    MongoClient.connect(
+      url,
+      (err, db) => {
+        if (err) {
+          reject(err);
+        }
+        console.log('MONGO LIVE');
+        resolve(db);
+      }
+    );
   });
 }
 

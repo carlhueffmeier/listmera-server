@@ -12,7 +12,7 @@ async function createPlaylist(newPlaylist, values) {
     tracks: trackId,
     bank: bankId,
     collabs: collabId,
-    ...values,
+    ...values
   };
   await client.hmset(`playlist:${playlistId}`, playlist);
   await client.sadd(`tracks:${bankId}`, newPlaylist.tracks);

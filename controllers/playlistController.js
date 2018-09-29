@@ -1,79 +1,84 @@
 const engine = require('../engine/engine.js');
 
-//locate a specific User and return it's details.
+// locate a specific User and return it's details.
 const locate = require('../models/userModels/findUser.js');
-//set a user as the admin user of a specific playlist. Processing function, returns 201 to show it worked correctly.
+// set a user as the admin user of a specific playlist. Processing function, returns 201 to show it worked correctly.
 const setAsManager = require('../models/userModels/userPlaylistModel.js');
-//removes a user as the manager for a playlist
+// removes a user as the manager for a playlist
 const removeAdmin = require('../models/userModels/removeAdmin.js');
 
-//push a playlist in Redis to a users spotify account.
+// push a playlist in Redis to a users spotify account.
 const generate = require('../models/spotifyModels/createPlaylist.js');
 
-//create a playlist on Redis. Returns playlist id in Redis.
+// create a playlist on Redis. Returns playlist id in Redis.
 const create = require('../models/playlistModels/createPlaylist.js');
-//grab a simplified version of a playlist (for display purposes only). Returns a promise that resolves to an object containing details.
+// grab a simplified version of a playlist (for display purposes only). Returns a promise that resolves to an object containing details.
 const display = require('../models/playlistModels/getDisplayPlaylist.js');
-//get all details and tracks for a specific playlist. Returns a promise that resolves to an object containing details.
+// get all details and tracks for a specific playlist. Returns a promise that resolves to an object containing details.
 const get = require('../models/playlistModels/getPlaylistDetails.js');
-//creates a short-lived (10 secs) cache of the collaborating users tracks and returns that cache's id.
+// creates a short-lived (10 secs) cache of the collaborating users tracks and returns that cache's id.
 const set = require('../models/playlistModels/createTrackList.js');
-//creates intersection between collaborating users tracks and playlist's tracks. Returns 200 to show it worked correctly.
+// creates intersection between collaborating users tracks and playlist's tracks. Returns 200 to show it worked correctly.
 const intersect = require('../models/playlistModels/intersectTracks.js');
-//retrieves all track ids for the specified playlist.
+// retrieves all track ids for the specified playlist.
 const getTracks = require('../models/playlistModels/retrieveTrackList.js');
-//get all recently created playlists
+// get all recently created playlists
 const recent = require('../models/playlistModels/recentPlaylists.js');
-//deletes a playlist
+// deletes a playlist
 const remove = require('../models/playlistModels/deletePlaylist.js');
 
 module.exports = {
-  create: async function (ctx) {
+  create: async function(ctx) {
     const req = JSON.parse(ctx.request.body);
-    const parsed = engine.parse(req.values, req.tempo)
+    const parsed = engine.parse(req.values, req.tempo);
     const user = await locate(req.username);
     const trackList = engine.init(user[0].playlists);
-    const newPlaylist = await create({
-      admin : req.username,
-      name : req.name,
-      tracks : trackList,
-    }, parsed);
-    ctx.status = await setAsManager({id: newPlaylist, username: req.username})
-    ctx.response.body = {id : newPlaylist};
+    const newPlaylist = await create(
+      {
+        admin: req.username,
+        name: req.name,
+        tracks: trackList
+      },
+      parsed
+    );
+    ctx.status = await setAsManager({ id: newPlaylist, username: req.username });
+    ctx.response.body = { id: newPlaylist };
   },
-  get: async function (ctx) {
-    const content = await display(ctx.params.id)
-      .catch(e => e);
+  get: async function(ctx) {
+    const content = await display(ctx.params.id).catch(e => e);
     if (!content) {
-      ctx.response.body = {status: null};
+      ctx.response.body = { status: null };
       ctx.status = 404;
     } else {
       ctx.response.body = content;
       ctx.status = 200;
     }
   },
-  collab: async function (ctx) {
+  collab: async function(ctx) {
     const user = await locate(JSON.parse(ctx.request.body).username);
     const tracks = engine.init(user[0].playlists);
     const trackId = await set(tracks);
     const playlist = await getTracks(ctx.params.id);
-    ctx.status = await intersect(playlist, trackId, user[0].username, user[0].refresh)
-      .catch(e => console.error(e));
+    ctx.status = await intersect(playlist, trackId, user[0].username, user[0].refresh).catch(e =>
+      console.error(e)
+    );
   },
-  generate: async function (ctx) {
+  generate: async function(ctx) {
     const user = await locate(JSON.parse(ctx.request.body).username);
     const playlist = await get(ctx.params.id);
-    const copy = JSON.parse(ctx.request.body).copy
+    const copy = JSON.parse(ctx.request.body).copy;
     if (user.length && user[0].username === playlist.adminId) {
-      await generate(playlist, user[0].refresh, ctx.params.id)
+      await generate(playlist, user[0].refresh, ctx.params.id);
       ctx.status = 201;
     } else if (!playlist.adminId) {
       ctx.status = 400;
     } else if (copy) {
-      await generate(playlist, user[0].refresh, ctx.params.id, copy, user[0])
-    } else ctx.status = 401;
+      await generate(playlist, user[0].refresh, ctx.params.id, copy, user[0]);
+    } else {
+      ctx.status = 401;
+    }
   },
-  delete: async function (ctx) {
+  delete: async function(ctx) {
     const playlist = await get(ctx.params.id);
     const user = await locate(JSON.parse(ctx.request.body).username);
     if (user.length && user[0].username === playlist.adminId) {
@@ -87,10 +92,13 @@ module.exports = {
         username: user[0].username,
         id: ctx.params.id
       });
-    } else if (!playlist.adminId) ctx.status = 400;
-    else ctx.status = 401;
+    } else if (!playlist.adminId) {
+      ctx.status = 400;
+    } else {
+      ctx.status = 401;
+    }
   },
-  recent: async function (ctx) {
+  recent: async function(ctx) {
     ctx.response.body = await recent();
     ctx.status = 200;
   }

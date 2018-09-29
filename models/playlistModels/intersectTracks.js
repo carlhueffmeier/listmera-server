@@ -5,20 +5,27 @@ const engine = require('../../engine/engine.js');
 async function intersect(playlist, collab, collaborator, refresh) {
   return new Promise(async (resolve, reject) => {
     client.sismember(`collabs:${playlist.collabs}`, collaborator, (err, results) => {
-      if (err) reject(500);
-      if (results) {
-      } else {
+      if (err) {
+        reject(500);
+      }
+      if (!results) {
         client.SINTER(`tracks:${playlist.bank}`, `tracks:${collab}`, async (err, intersect) => {
-          let rejected = [];
           if (intersect.length) {
             const filtered = await getFeatures(intersect, refresh);
             const matched = engine.match(filtered.body.audio_features, playlist);
             client.sadd(`tracks:${playlist.tracks}`, matched);
-          } if (err) reject(500);
+          }
+          if (err) {
+            reject(500);
+          }
           client.sdiff(`tracks:${collab}`, `tracks:${playlist.bank}`, (err, diff) => {
-            if (diff.length) client.sadd(`tracks:${playlist.bank}`, diff);
+            if (diff.length) {
+              client.sadd(`tracks:${playlist.bank}`, diff);
+            }
             client.sadd(`collabs:${playlist.collabs}`, collaborator);
-            if (err) reject(500);
+            if (err) {
+              reject(500);
+            }
             resolve(200);
           });
         });

@@ -4,11 +4,13 @@ async function loginUser(data) {
   const db = await mongo;
   return new Promise((resolve, reject) => {
     db.collection('users')
-      .find({username: data.username})
+      .find({ username: data.username })
       .toArray((err, results) => {
         resolve(results);
-        if (err) reject(err);
-      });;
+        if (err) {
+          reject(err);
+        }
+      });
   });
 }
 

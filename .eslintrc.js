@@ -5,16 +5,19 @@ module.exports = {
     es6: true
   },
   parserOptions: {
-    ecmaVersion: 2018
+    ecmaVersion: 2018,
+    sourceType: 'module',
+    ecmaFeatures: {
+      impliedStrict: true
+    }
   },
   rules: {
     'no-debugger': 'off',
+    'no-console': 'off',
     'no-return-await': 'error',
     'no-return-assign': 'error',
     'no-throw-literal': 'error',
     'no-new-wrappers': 'error',
-    'no-magic-numbers': 'warn',
-    strict: ['error', 'global'],
     yoda: 'error',
     curly: 'warn'
   },
