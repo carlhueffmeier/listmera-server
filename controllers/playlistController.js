@@ -1,7 +1,7 @@
 const Spotify = require('../models/spotify');
 const User = require('../models/user');
 const Playlist = require('../models/playlist');
-const engine = require('../lib/engine');
+const playlistUtils = require('../lib/playlistUtils');
 
 module.exports = {
   create: async function(ctx) {
@@ -9,15 +9,15 @@ module.exports = {
     const spotifyId = body.username;
     const user = await User.findOne(spotifyId);
 
-    const parsed = engine.parse(body.values, body.tempo);
-    const trackList = engine.init(user.playlists);
+    const parsedFeatures = playlistUtils.parseFeatureSpecs(body.values, body.tempo);
+    const trackList = playlistUtils.getAllTracks(user.playlists);
     const newPlaylistId = await Playlist.create(
       {
         admin: body.username,
         name: body.name,
         tracks: trackList
       },
-      parsed
+      parsedFeatures
     );
     await User.addAdmin({ id: newPlaylistId, username: body.username });
     ctx.status = 201;
@@ -38,7 +38,7 @@ module.exports = {
     const spotifyId = body.username;
     const user = await User.findOne(spotifyId);
 
-    const tracks = engine.init(user[0].playlists);
+    const tracks = playlistUtils.getAllTracks(user.playlists);
     const trackId = await Playlist.set(tracks);
     const playlist = await Playlist.getTracks(ctx.params.id);
     await Playlist.intersect(playlist, trackId, user.username, user.refresh);

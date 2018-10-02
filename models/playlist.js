@@ -1,6 +1,6 @@
 const uuid = require('shortid');
 const redis = require('./redis');
-const engine = require('../lib/engine');
+const playlistUtils = require('../lib/playlistUtils');
 const mongoose = require('mongoose');
 const User = mongoose.model('User');
 const Track = mongoose.model('Track');
@@ -30,7 +30,7 @@ const playlistModel = {
 
 module.exports = playlistModel;
 
-async function create(newPlaylist, values) {
+async function create(newPlaylist, features) {
   const playlistId = uuid.generate();
   const trackId = uuid.generate();
   const bankId = uuid.generate();
@@ -41,7 +41,7 @@ async function create(newPlaylist, values) {
     tracks: trackId,
     bank: bankId,
     collabs: collabId,
-    ...values
+    ...features
   };
   await redis.hmset(`playlist:${playlistId}`, playlist);
   await redis.sadd(`tracks:${bankId}`, newPlaylist.tracks);
@@ -159,7 +159,7 @@ async function intersect(playlist, collab, collaborator, refresh) {
     const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
     if (intersect.length) {
       const filtered = await Spotify.getFeatures(intersect, refresh);
-      const matched = engine.match(filtered.body.audio_features, playlist);
+      const matched = playlistUtils.getMatchingTrackIds(filtered.body.audio_features, playlist);
       redis.sadd(`tracks:${playlist.tracks}`, matched);
     }
     const diff = await redis.sdiffAsync(`tracks:${collab}`, `tracks:${playlist.bank}`);
