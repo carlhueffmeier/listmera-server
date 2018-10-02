@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const User = mongoose.model('User');
 const Track = mongoose.model('Track');
 const Spotify = require('./spotify');
+const { pick } = require('../lib/utils');
 
 const playlistModel = {
   // create a playlist on Redis. Returns playlist id in Redis.
@@ -50,242 +51,161 @@ async function create(newPlaylist, values) {
 }
 
 async function display(id) {
-  return new Promise((resolve, reject) => {
-    const playlist = {};
-    playlist.id = id;
-    redis.hgetall(`playlist:${id}`, async (err, details) => {
-      if (err) {
-        reject(err);
-      }
-      if (!details) {
-        resolve(null);
-      }
-      playlist.adminId = details.admin;
-      const user = await User.findOne({ spotifyId: playlist.adminId });
-      playlist.admin = user.name;
-      playlist.name = details.name;
-      if (details.dance) {
-        playlist.dance = 'Dance';
-      }
-      if (details.energy) {
-        playlist.energy = 'Energetic';
-      }
-      if (details.loud) {
-        playlist.loud = 'Loud';
-      }
-      if (details.instrumental) {
-        playlist.instrumental = 'Instrumental';
-      }
-      if (details.live) {
-        playlist.live = 'Live';
-      }
-      if (details.mood === '1') {
-        playlist.mood = 'Happy';
-      }
-      if (details.mood === '0') {
-        playlist.mood = 'Sad';
-      }
-      if (details.major) {
-        playlist.major = 'Major';
-      }
-      if (details.minor) {
-        playlist.minor = 'Minor';
-      }
-      if (details.done) {
-        playlist.done = true;
-      }
-      redis.smembers(`tracks:${details.tracks}`, async (err, tracks) => {
-        if (err) {
-          reject(err);
-        }
-        playlist.length = tracks.length;
-        playlist.tracks = await Promise.all(tracks.map(trackId => Track.findOne({ trackId })));
-        playlist.tracks = playlist.tracks.length
-          ? playlist.tracks.reduce((prev, curr) => prev.concat(curr))
-          : [];
-        playlist.cover = playlist.tracks.length
-          ? playlist.tracks
-              .reduce((acc, el) => {
-                if (acc.length < 4) {
-                  acc.push({ image: el.image, popularity: el.popularity });
-                  return acc.sort((a, b) => b.popularity - a.popularity);
-                } else if (el.popularity > acc[3].popularity) {
-                  acc = [...acc.slice(0, 3), { image: el.image, popularity: el.popularity }];
-                  return acc.sort((a, b) => b.popularity - a.popularity);
-                } else {
-                  return acc;
-                }
-              }, [])
-              .map(el => el.image)
-          : undefined;
-        redis.smembers(`collabs:${details.collabs}`, async (err, users) => {
-          if (err) {
-            reject(err);
-          }
-          const collabers = await Promise.all(users.map(spotifyId => User.findOne({ spotifyId })));
-          playlist.collabers = collabers.map(user => user.name);
-          resolve(playlist);
-        });
-      });
-    });
+  let playlist = {};
+  playlist.id = id;
+
+  const details = await redis.hgetallAsync(`playlist:${id}`);
+  if (!details) {
+    return;
+  }
+  playlist.adminId = details.admin;
+  const user = await User.findOne({ spotifyId: playlist.adminId });
+  playlist.admin = user.name;
+  playlist.name = details.name;
+  playlist = {
+    playlist,
+    ...parsePlaylistDetails(details)
+  };
+  const tracks = await redis.smembersAsync(`tracks:${details.tracks}`);
+  playlist.length = tracks.length;
+  playlist.tracks = await Promise.all(tracks.map(trackId => Track.findOne({ trackId })));
+  if (!playlist.tracks) {
+    playlist.tracks = [];
+  }
+  playlist.cover = extractTrackCovers(playlist);
+  const users = await redis.smembersAsync(`collabs:${details.collabs}`);
+  const collabers = await Promise.all(users.map(spotifyId => User.findOne({ spotifyId })));
+  playlist.collabers = collabers.map(user => user.name);
+  return playlist;
+}
+
+function parsePlaylistDetails(details) {
+  const dict = {
+    dance: 'Dance',
+    energy: 'Energetic',
+    loud: 'Loud',
+    instrumental: 'Instrumental',
+    live: 'Live',
+    major: 'Major',
+    minor: 'Minor'
+  };
+  return Object.keys(details).reduce((playlistDetails, [key, value]) => {
+    if (dict.hasOwnProperty(key)) {
+      playlistDetails[key] = dict[key];
+    } else if (key === 'mood') {
+      playlistDetails.mood = value === 0 ? 'Sad' : 'Happy';
+    } else if (key === 'done') {
+      playlistDetails.done = true;
+    }
+    return playlistDetails;
   });
 }
 
+function extractTrackCovers(playlist) {
+  return playlist.tracks.length
+    ? playlist.tracks
+        .reduce((acc, el) => {
+          if (acc.length < 4) {
+            acc.push({ image: el.image, popularity: el.popularity });
+            return acc.sort((a, b) => b.popularity - a.popularity);
+          } else if (el.popularity > acc[3].popularity) {
+            acc = [...acc.slice(0, 3), { image: el.image, popularity: el.popularity }];
+            return acc.sort((a, b) => b.popularity - a.popularity);
+          } else {
+            return acc;
+          }
+        }, [])
+        .map(el => el.image)
+    : undefined;
+}
+
 async function get(id) {
-  return new Promise((resolve, reject) => {
-    const playlist = {};
-    redis.hgetall(`playlist:${id}`, async (err, details) => {
-      playlist.adminId = details.admin;
-      const user = await User.findOne({ spotifyId: playlist.adminId });
-      playlist.collabs = details.collabs;
-      playlist.bank = details.bank;
-      playlist.admin = user.name;
-      playlist.name = details.name;
-      playlist.trackId = details.tracks;
-      playlist.strict = Number(details.strict);
-      if (details.dance) {
-        playlist.dance = details.dance;
-      }
-      if (details.energy) {
-        playlist.energy = details.energy;
-      }
-      if (details.loud) {
-        playlist.loud = details.loud;
-      }
-      if (details.instrumental) {
-        playlist.instrumental = details.instrumental;
-      }
-      if (details.live) {
-        playlist.live = details.live;
-      }
-      if (Number(details.mood)) {
-        playlist.mood = Number(details.mood);
-      }
-      if (Number(details.mood) === 0) {
-        playlist.mood = Number(details.mood);
-      }
-      if (details.major) {
-        playlist.major = details.major;
-      }
-      if (details.minor) {
-        playlist.minor = details.minor;
-      }
-      if (err) {
-        reject(err);
-      }
-      redis.smembers(`tracks:${details.tracks}`, async (err, reply) => {
-        playlist.tracks = reply;
-        resolve(playlist);
-        if (err) {
-          reject(err);
-        }
-      });
-    });
-  });
+  const details = await redis.hgetallAsync(`playlist:${id}`);
+  const user = await User.findOne({ spotifyId: details.admin });
+  const keysToCopy = [
+    'name',
+    'banks',
+    'collabs',
+    'strict',
+    'dance',
+    'energy',
+    'loud',
+    'instrumental',
+    'live',
+    'mood',
+    'major',
+    'minor'
+  ];
+  const playlist = {
+    adminId: details.admin,
+    admin: user.name,
+    trackId: details.tracks,
+    tracks: await redis.smembersAsync(`tracks:${details.tracks}`),
+    ...pick(keysToCopy, details)
+  };
+  return playlist;
 }
 
 async function set(tracks) {
   const trackId = uuid.generate();
-  await redis.sadd(`tracks:${trackId}`, tracks);
-  await redis.expireat(`tracks:${trackId}`, parseInt(+new Date() / 1000) + 10);
+  redis.sadd(`tracks:${trackId}`, tracks);
+  redis.expireat(`tracks:${trackId}`, parseInt(+new Date() / 1000) + 10);
   return trackId;
 }
 
 async function intersect(playlist, collab, collaborator, refresh) {
-  return new Promise(async (resolve, reject) => {
-    redis.sismember(`collabs:${playlist.collabs}`, collaborator, (err, results) => {
-      if (err) {
-        reject(500);
-      }
-      if (!results) {
-        redis.SINTER(`tracks:${playlist.bank}`, `tracks:${collab}`, async (err, intersect) => {
-          if (intersect.length) {
-            const filtered = await Spotify.getFeatures(intersect, refresh);
-            const matched = engine.match(filtered.body.audio_features, playlist);
-            redis.sadd(`tracks:${playlist.tracks}`, matched);
-          }
-          if (err) {
-            reject(500);
-          }
-          redis.sdiff(`tracks:${collab}`, `tracks:${playlist.bank}`, (err, diff) => {
-            if (diff.length) {
-              redis.sadd(`tracks:${playlist.bank}`, diff);
-            }
-            redis.sadd(`collabs:${playlist.collabs}`, collaborator);
-            if (err) {
-              reject(500);
-            }
-            resolve(200);
-          });
-        });
-      }
-    });
-  });
+  const results = await redis.sismemberAsync(`collabs:${playlist.collabs}`, collaborator);
+  if (!results) {
+    const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
+    if (intersect.length) {
+      const filtered = await Spotify.getFeatures(intersect, refresh);
+      const matched = engine.match(filtered.body.audio_features, playlist);
+      redis.sadd(`tracks:${playlist.tracks}`, matched);
+    }
+    const diff = await redis.sdiffAsync(`tracks:${collab}`, `tracks:${playlist.bank}`);
+    if (diff.length) {
+      redis.sadd(`tracks:${playlist.bank}`, diff);
+    }
+    redis.sadd(`collabs:${playlist.collabs}`, collaborator);
+  }
 }
 
 async function getTracks(id) {
-  return new Promise((resolve, reject) => {
-    redis.hgetall(`playlist:${id}`, async (err, reply) => {
-      resolve(reply);
-      if (err) {
-        reject(err);
-      }
-    });
-  });
+  return redis.hgetall(`playlist:${id}`);
 }
 
 async function recent() {
-  return new Promise((resolve, reject) => {
-    redis.smembers('recent', async (err, reply) => {
-      if (err) {
-        reject(err);
-      }
-      if (!reply.length) {
-        resolve({ playlists: [] });
-      }
-      let playlists = await Promise.all(reply.map(el => display(el)));
-      playlists = playlists.map(el => {
-        if (el.tracks.length) {
-          const coverImg = el.tracks
-            .reduce((acc, el) => {
-              if (acc.length < 4) {
-                acc.push({ image: el.image, popularity: el.popularity });
-                return acc.sort((a, b) => b.popularity - a.popularity);
-              } else if (el.popularity > acc[3].popularity) {
-                acc = [...acc.slice(0, 3), { image: el.image, popularity: el.popularity }];
-                return acc.sort((a, b) => b.popularity - a.popularity);
-              } else {
-                return acc;
-              }
-            }, [])
-            .map(el => el.image);
-          return {
-            ...el,
-            cover: coverImg
-          };
-        } else {
-          return el;
-        }
-      });
-      resolve({ playlists });
-    });
-  });
+  const reply = await redis.smembersAsync('recent');
+  if (!reply.length) {
+    return { playlists: [] };
+  }
+  let playlists = await Promise.all(reply.map(el => display(el)));
+  playlists = playlists.map(
+    playlist =>
+      playlist.tracks.length > 0
+        ? {
+            ...playlist,
+            cover: extractTrackCovers(playlist)
+          }
+        : playlist
+  );
+  return { playlists };
 }
 
-async function remove(object) {
-  await redis.del(`playlist:${object.playlist}`);
-  await redis.del(`tracks:${object.bank}`);
-  await redis.del(`tracks:${object.tracks}`);
-  await redis.del(`collabs:${object.collabs}`);
-  await redis.srem('recent', object.playlist);
+async function remove(playlist) {
+  redis.del(`playlist:${playlist.playlist}`);
+  redis.del(`tracks:${playlist.bank}`);
+  redis.del(`tracks:${playlist.tracks}`);
+  redis.del(`collabs:${playlist.collabs}`);
+  redis.srem('recent', playlist.playlist);
   return 'done';
 }
 
-async function expire(object) {
-  await redis.hmset(`playlist:${object.playlist}`, { done: 1 });
-  await redis.expireat(`playlist:${object.playlist}`, parseInt(+new Date() / 1000) + 3600);
-  await redis.expireat(`tracks:${object.bank}`, parseInt(+new Date() / 1000) + 3600);
-  await redis.expireat(`tracks:${object.tracks}`, parseInt(+new Date() / 1000) + 3600);
-  await redis.expireat(`collabs:${object.collabs}`, parseInt(+new Date() / 1000) + 3600);
-  await redis.srem('recent', object.playlist, parseInt(+new Date() / 1000) + 3600);
+async function expire(playlist) {
+  redis.hmset(`playlist:${playlist.playlist}`, { done: 1 });
+  redis.expireat(`playlist:${playlist.playlist}`, parseInt(+new Date() / 1000) + 3600);
+  redis.expireat(`tracks:${playlist.bank}`, parseInt(+new Date() / 1000) + 3600);
+  redis.expireat(`tracks:${playlist.tracks}`, parseInt(+new Date() / 1000) + 3600);
+  redis.expireat(`collabs:${playlist.collabs}`, parseInt(+new Date() / 1000) + 3600);
+  redis.srem('recent', playlist.playlist, parseInt(+new Date() / 1000) + 3600);
 }
