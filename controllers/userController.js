@@ -1,25 +1,23 @@
-const locate = require('../models/userModels/findUser.js');
-// const setAsManager = require('../models/userModels/userPlaylistModel.js');
-const modify = require('../models/userModels/modifyUser.js');
-
-const display = require('../models/playlistModels/getDisplayPlaylist.js');
+const User = require('../models/user');
+const Playlist = require('../models/playlist');
 
 module.exports = {
   get: async function(ctx) {
-    const user = await locate(ctx.headers.user);
-    if (!user[0]) {
+    const spotifyId = ctx.headers.user;
+    const user = await User.findOne(spotifyId);
+    if (!user) {
       ctx.status = 401;
-      return;
     } else {
-      user[0].adminOf = await Promise.all(user[0].adminOf.map(el => display(el, true)));
-      ctx.response.body = user[0];
+      user.adminOf = await Promise.all(user.adminOf.map(playlist => Playlist.display(playlist)));
+      ctx.response.body = user;
       ctx.status = 200;
     }
   },
+
   modify: async function(ctx) {
-    const object = JSON.parse(ctx.request.body);
-    const username = object.username;
-    delete object.username;
-    ctx.status = await modify(username, object);
+    const body = JSON.parse(ctx.request.body);
+    const { username, ...update } = body;
+    await User.update(username, update);
+    ctx.status = 200;
   }
 };

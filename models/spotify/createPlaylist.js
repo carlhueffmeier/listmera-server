@@ -1,6 +1,6 @@
 const spotify = require('../../secrets/spotifyConf.js');
-const removeAdmin = require('../userModels/removeAdmin.js');
-const expire = require('../playlistModels/setExpiry.js');
+const User = require('../user');
+const Playlist = require('../playlist');
 
 // Converts a Spotify Track ID to a Spotify Track URI
 function createTrackUri(trackId) {
@@ -45,11 +45,11 @@ async function generatePlaylist({ playlist, refresh, id }) {
   const result = await spotify.createPlaylist(...createPlaylistOptions);
   const newPlaylistId = result.body.id;
   await spotify.addTracksToPlaylist(playlist.adminId, newPlaylistId, trackUris);
-  await removeAdmin({
+  await User.removeAdmin({
     username: playlist.adminId,
     id
   });
-  await expire({
+  await Playlist.expire({
     playlist: id,
     bank: playlist.bank,
     tracks: playlist.trackId,

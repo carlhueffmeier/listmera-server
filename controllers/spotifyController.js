@@ -1,7 +1,6 @@
 // contains basic spotify setup
 const spotify = require('../secrets/spotifyConf.js');
-// pushes user through authentication and login process via spotify and returns all the users details.
-const register = require('../models/spotifyModels/getAuth.js');
+const Spotify = require('../models/spotify');
 
 const scopes = [
   'user-read-private',
@@ -15,16 +14,18 @@ const state = 'prov-state';
 
 module.exports = {
   auth: async function(ctx) {
-    ctx.redirect(spotify.createAuthorizeURL(scopes, state));
+    const redirectUri = spotify.createAuthorizeURL(scopes, state);
+    ctx.redirect(redirectUri);
   },
+
   register: async function(ctx) {
-    const authCode = JSON.parse(ctx.request.body).code;
-    const user = await register(authCode);
+    const body = JSON.parse(ctx.request.body);
+    const user = await Spotify.authenticate(body.code);
     ctx.response.body = {
-      name: user[0].name,
-      username: user[0].username,
-      picture: user[0].picture,
-      playlists: user[0].adminOf
+      name: user.name,
+      username: user.spotifyId,
+      picture: user.picture,
+      playlists: user.adminOf
     };
     ctx.status = 200;
   }

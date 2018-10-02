@@ -1,5 +1,5 @@
 const spotify = require('../../secrets/spotifyConf.js');
-const { chunk, concatAll } = require('../../lib/utils');
+const { chunk, concatAll } = require('../../lib/utils.js');
 
 async function getFeatures(tracks, refresh) {
   await spotify.setRefreshToken(refresh);
