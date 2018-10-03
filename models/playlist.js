@@ -51,8 +51,9 @@ async function display(id) {
   if (!details) {
     return;
   }
+
   playlist.adminId = details.admin;
-  const user = await User.findOne({ spotifyId: playlist.adminId });
+  const user = await User.findOne({ username: playlist.adminId });
   playlist.admin = user.name;
   playlist.name = details.name;
   playlist = {
@@ -67,7 +68,7 @@ async function display(id) {
   }
   playlist.cover = extractTrackCovers(playlist);
   const users = await redis.smembersAsync(`collabs:${details.collabs}`);
-  const collabers = await Promise.all(users.map(spotifyId => User.findOne({ spotifyId })));
+  const collabers = await Promise.all(users.map(username => User.findOne({ username })));
   playlist.collabers = collabers.map(user => user.name);
   return playlist;
 }
@@ -115,7 +116,7 @@ function extractTrackCovers(playlist) {
 // Get all details and tracks for a specific playlist
 async function get(id) {
   const details = await redis.hgetallAsync(`playlist:${id}`);
-  const user = await User.findOne({ spotifyId: details.admin });
+  const user = await User.findOne({ username: details.admin });
   const keysToCopy = [
     'name',
     'banks',
@@ -142,11 +143,11 @@ async function get(id) {
 
 // creates a short-lived (10 secs) cache of the collaborating users tracks and
 // returns that cache's id.
-async function set(tracks) {
-  const trackId = uuid.generate();
-  redis.sadd(`tracks:${trackId}`, tracks);
-  redis.expireat(`tracks:${trackId}`, parseInt(+new Date() / 1000) + 10);
-  return trackId;
+async function set(trackIds) {
+  const cacheId = uuid.generate();
+  redis.sadd(`tracks:${cacheId}`, trackIds);
+  redis.expireat(`tracks:${cacheId}`, parseInt(+new Date() / 1000) + 10);
+  return cacheId;
 }
 
 // Creates intersection between collaborating users tracks and playlist's tracks
@@ -155,7 +156,7 @@ async function intersect(playlist, collab, collaborator, refresh) {
   if (!results) {
     const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
     if (intersect.length) {
-      const filtered = await spotifyService.getFeatures(intersect, refresh);
+      const filtered = await spotifyService.getAudioFeatures(intersect, refresh);
       const matched = playlistUtils.getMatchingTrackIds(filtered.body.audio_features, playlist);
       redis.sadd(`tracks:${playlist.tracks}`, matched);
     }
@@ -169,7 +170,7 @@ async function intersect(playlist, collab, collaborator, refresh) {
 
 // Retrieves all track ids for the specified playlist
 async function getTracks(id) {
-  return redis.hgetall(`playlist:${id}`);
+  return redis.hgetallAsync(`playlist:${id}`);
 }
 
 // Get all recently created playlists

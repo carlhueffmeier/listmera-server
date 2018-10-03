@@ -12,19 +12,19 @@ const userModel = {
 
 module.exports = userModel;
 
-function findById(spotifyId) {
-  return User.findOne({ spotifyId });
+function findById(username) {
+  return User.findOne({ username });
 }
 
-function update(spotifyId, changes) {
-  return User.findOneAndUpdate({ spotifyId }, changes, { new: true });
+function update(username, changes) {
+  return User.findOneAndUpdate({ username }, changes, { new: true });
 }
 
 // Create a new user and add all his/her songs to the database
 async function register(user) {
   await Promise.all(user.playlists.map(addMissingTracksToDatabase));
   const playlists = user.playlists.map(replaceTracksWithTrackIds);
-  return new User({ ...user, spotifyId: user.username, playlists }).save();
+  return new User({ ...user, username: user.username, playlists }).save();
 }
 
 function addMissingTracksToDatabase(playlist) {
@@ -50,11 +50,11 @@ function replaceTracksWithTrackIds(playlist) {
 }
 
 // Add admin rights for a specific playlist
-function addAdmin({ username: spotifyId, id: playlistId } = {}) {
-  return User.updateOne({ spotifyId }, { $push: { adminOf: playlistId } });
+function addAdmin({ username, id: playlistId } = {}) {
+  return User.updateOne({ username }, { $push: { adminOf: playlistId } });
 }
 
 // Remove admin rights for a specific playlist
-function removeAdmin({ username: spotifyId, id: playlistId } = {}) {
-  return User.updateOne({ spotifyId }, { $pull: { adminOf: playlistId } });
+function removeAdmin({ username, id: playlistId } = {}) {
+  return User.updateOne({ username }, { $pull: { adminOf: playlistId } });
 }

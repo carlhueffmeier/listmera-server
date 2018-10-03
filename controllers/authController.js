@@ -9,7 +9,7 @@ async function registerUser(ctx) {
   const user = await spotifyService.registerNewUser(ctx.request.body.code);
   ctx.response.body = {
     name: user.name,
-    username: user.spotifyId,
+    username: user.username,
     picture: user.picture,
     playlists: user.adminOf
   };

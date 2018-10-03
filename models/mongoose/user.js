@@ -14,9 +14,9 @@ const playlistSchema = new mongoose.Schema({
 });
 
 const userSchema = new mongoose.Schema({
-  spotifyId: {
+  username: {
     type: String,
-    required: 'User needs an associated spotifyId'
+    required: 'User needs an associated username'
   },
   name: {
     type: String,

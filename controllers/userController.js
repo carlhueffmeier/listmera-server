@@ -2,8 +2,8 @@ const User = require('../models/user');
 const Playlist = require('../models/playlist');
 
 async function getUser(ctx) {
-  const spotifyId = ctx.headers.user;
-  const user = await User.findById(spotifyId);
+  const username = ctx.headers.user;
+  const user = await User.findById(username);
   if (!user) {
     ctx.status = 401;
   } else {

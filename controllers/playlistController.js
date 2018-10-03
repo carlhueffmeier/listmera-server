@@ -34,10 +34,12 @@ async function getPlaylist(ctx) {
 
 async function collaborateOnPlaylist(ctx) {
   const user = ctx.user;
-  const tracks = playlistUtils.getAllTracks(user.playlists);
-  const trackId = await Playlist.set(tracks);
+  const userTracks = playlistUtils.getAllTracks(user.playlists);
+  // Creating a short lived cache of user track ids
+  const cacheId = await Playlist.set(userTracks);
+  // Getting all tracks from playlist user wants to collaborate with
   const playlist = await Playlist.getTracks(ctx.params.id);
-  await Playlist.intersect(playlist, trackId, user.username, user.refresh);
+  await Playlist.intersect(playlist, cacheId, user.username, user.refresh);
   ctx.status = 200;
 }
 
