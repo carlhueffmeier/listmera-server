@@ -59,7 +59,7 @@ async function display(id) {
   const playlist = {
     id,
     name: details.name,
-    adminId: details.adminId,
+    adminId: details.admin,
     admin: adminUser.name,
     length: tracks.length,
     tracks: defaults(fullTrackInfo, []),
