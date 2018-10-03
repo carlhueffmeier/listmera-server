@@ -13,7 +13,7 @@ async function getAudioFeatures(tracks, refresh) {
   // Get audio features in groups of 40 to make sure we are below the maximum
   // URL length of 2083 characters
   const chunkedResponse = await Promise.all(
-    chunk(tracks, 40).map(spotifyApi.getAudioFeaturesForTracks)
+    chunk(tracks, 40).map(chunkOfTracks => spotifyApi.getAudioFeaturesForTracks(chunkOfTracks))
   );
   return concatAll(chunkedResponse);
 }
