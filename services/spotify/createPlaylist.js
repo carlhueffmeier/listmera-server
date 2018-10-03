@@ -2,15 +2,12 @@ const spotifyApi = require('./spotifyApi');
 const User = require('../../models/user');
 const Playlist = require('../../models/playlist');
 
-// Converts a Spotify Track ID to a Spotify Track URI
-function createTrackUri(trackId) {
-  return 'spotify:track:' + trackId;
-}
-
-async function resetSpotifyAccessToken(refresh) {
-  await spotifyApi.setRefreshToken(refresh);
-  const data = await spotifyApi.refreshAccessToken();
-  spotifyApi.setAccessToken(data.body['access_token']);
+function createPlaylist({ playlist, refresh, id, copier } = {}) {
+  if (copier) {
+    return createPlaylistCopy({ playlist, refresh, copier });
+  } else {
+    return createNewPlaylist({ playlist, refresh, id });
+  }
 }
 
 async function createPlaylistCopy({ playlist, refresh, copier }) {
@@ -102,7 +99,7 @@ function generateAttributes(playlist, seedTracks) {
 
   function attributeReducer(attributes, [currentAttribute, value]) {
     if (attributeDictionary.includes(currentAttribute)) {
-      let key = attributeDictionary[currentAttribute];
+      const key = attributeDictionary[currentAttribute];
       attributes[key] = value;
     } else if (currentAttribute === 'mood' && value === 0) {
       attributes.max_valence = 0.5;
@@ -117,12 +114,15 @@ function generateAttributes(playlist, seedTracks) {
   }
 }
 
-function createPlaylist({ playlist, refresh, id, copier } = {}) {
-  if (copier) {
-    return createPlaylistCopy({ playlist, refresh, copier });
-  } else {
-    return createNewPlaylist({ playlist, refresh, id });
-  }
+// Converts a Spotify Track ID to a Spotify Track URI
+function createTrackUri(trackId) {
+  return 'spotify:track:' + trackId;
+}
+
+async function resetSpotifyAccessToken(refresh) {
+  await spotifyApi.setRefreshToken(refresh);
+  const data = await spotifyApi.refreshAccessToken();
+  spotifyApi.setAccessToken(data.body['access_token']);
 }
 
 module.exports = createPlaylist;

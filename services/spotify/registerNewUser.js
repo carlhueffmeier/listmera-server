@@ -3,33 +3,44 @@ const { defaults } = require('../../lib/utils');
 const User = require('../../models/user');
 
 async function registerNewUser(code) {
-  const newUser = {};
+  // Refresh tokens
   const authResponse = await spotifyApi.authorizationCodeGrant(code);
   const { access_token, refresh_token } = authResponse.body;
   await spotifyApi.setAccessToken(access_token);
   await spotifyApi.setRefreshToken(refresh_token);
-  newUser.token = access_token;
-  newUser.refresh = refresh_token;
+  // Get user details from spotify
   const { body: userDetails } = await spotifyApi.getMe();
+  // Check whether we already have a record of the user
   const userExists = await User.findById(userDetails.id);
-  if (userDetails.images[0]) {
-    newUser.picture = userDetails.images[0].url;
-  }
-  newUser.email = userDetails.email;
-  newUser.username = userDetails.id;
-  newUser.name = userDetails.display_name || userDetails.id;
-
+  // Gather user information
+  const newUser = {
+    token: access_token,
+    refresh: refresh_token,
+    picture: getUserImage(userDetails),
+    email: userDetails.email,
+    username: userDetails.id,
+    name: defaults(userDetails.display_name, userDetails.id)
+  };
   if (userExists) {
+    // Return exisiting user
     return User.findById(userDetails.id);
   } else {
+    // Grab user playlists from spotify and return the newly created user
+    // `register` will also add user playlists and tracks to our database
     newUser.playlists = await getUserPlaylists(userDetails.id);
     return User.register(newUser);
   }
 }
 
+function getUserImage(userDetails) {
+  if (userDetails.images[0]) {
+    return userDetails.images[0].url;
+  }
+}
 async function getUserPlaylists(spotifyUserId) {
   const userPlaylistResult = await spotifyApi.getUserPlaylists(spotifyUserId, { limit: 50 });
   const partialPlaylists = userPlaylistResult.body.items;
+  // We want to retrieve playlists containing all track information
   return Promise.all(
     partialPlaylists.map(playlist => populatePlaylistWithTracks(spotifyUserId, playlist))
   );
@@ -42,11 +53,8 @@ async function populatePlaylistWithTracks(spotifyUserId, playlist) {
 }
 
 function formatPlaylistTrack(playlistTrack) {
+  // The playlist tracks store all detailed track info on `track` object
   const { track } = playlistTrack;
-  let image;
-  if (track.album.images && track.album.images.length > 0) {
-    image = track.album.images[0].url;
-  }
   return {
     id: track.id,
     name: defaults(track.name, 'Unknown'),
@@ -54,8 +62,14 @@ function formatPlaylistTrack(playlistTrack) {
     popularity: defaults(track.popularity, 0),
     artists: getArtistName(track),
     album: defaults(track.album.name, 'Unknown'),
-    image
+    image: getTrackImage(track)
   };
+
+  function getTrackImage(track) {
+    if (track.album.images && track.album.images.length > 0) {
+      return track.album.images[0].url;
+    }
+  }
 
   function getArtistName(track) {
     if (track.artists.length > 1) {

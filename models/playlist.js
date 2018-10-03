@@ -27,7 +27,7 @@ function create(playlistInfo, features) {
   const trackId = uuid.generate();
   const bankId = uuid.generate();
   const collabId = uuid.generate();
-  let newPlaylist = {
+  const newPlaylist = {
     admin: playlistInfo.admin,
     name: playlistInfo.name,
     tracks: trackId,
