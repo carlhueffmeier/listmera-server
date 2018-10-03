@@ -156,8 +156,8 @@ async function intersect(playlist, collab, collaborator, refresh) {
   if (!results) {
     const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
     if (intersect.length) {
-      const filtered = await getAudioFeatures(intersect, refresh);
-      const matched = playlistUtils.getMatchingTrackIds(filtered.body.audio_features, playlist);
+      const audioFeatures = await getAudioFeatures(intersect, refresh);
+      const matched = playlistUtils.getMatchingTrackIds(audioFeatures, playlist);
       redis.sadd(`tracks:${playlist.tracks}`, matched);
     }
     const diff = await redis.sdiffAsync(`tracks:${collab}`, `tracks:${playlist.bank}`);
