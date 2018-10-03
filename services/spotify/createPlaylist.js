@@ -40,7 +40,7 @@ async function createNewPlaylist({ playlist, refresh, id }) {
   }
   const createPlaylistOptions = [
     playlist.adminId,
-    playlist.name,
+    playlist.name || 'Listmera Playlist 🕺 💃',
     { description: 'powered by listmera' }
   ];
   const result = await spotifyApi.createPlaylist(...createPlaylistOptions);
