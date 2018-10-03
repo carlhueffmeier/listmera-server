@@ -3,7 +3,7 @@ const createPlaylist = require('./createPlaylist');
 const registerNewUser = require('./registerNewUser');
 const createAuthorizeUrl = require('./createAuthorizeUrl');
 
-const spotifyModel = {
+const spotifyService = {
   getAudioFeatures,
   // push a playlist in Redis to a users spotify account.
   createPlaylist,
@@ -13,4 +13,4 @@ const spotifyModel = {
   createAuthorizeUrl
 };
 
-module.exports = spotifyModel;
+module.exports = spotifyService;

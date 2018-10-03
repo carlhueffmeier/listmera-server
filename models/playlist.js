@@ -4,7 +4,7 @@ const playlistUtils = require('../lib/playlistUtils');
 const mongoose = require('mongoose');
 const User = mongoose.model('User');
 const Track = mongoose.model('Track');
-const spotifyService = require('../services/spotify');
+const getAudioFeatures = require('../services/spotify/getAudioFeatures');
 const { pick } = require('../lib/utils');
 
 const playlistModel = {
@@ -156,7 +156,7 @@ async function intersect(playlist, collab, collaborator, refresh) {
   if (!results) {
     const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
     if (intersect.length) {
-      const filtered = await spotifyService.getAudioFeatures(intersect, refresh);
+      const filtered = await getAudioFeatures(intersect, refresh);
       const matched = playlistUtils.getMatchingTrackIds(filtered.body.audio_features, playlist);
       redis.sadd(`tracks:${playlist.tracks}`, matched);
     }
