@@ -22,7 +22,7 @@ async function createNewPlaylist(ctx) {
 }
 
 async function getPlaylist(ctx) {
-  const content = await Playlist.display(ctx.params.id).catch(e => e);
+  const content = await Playlist.display(ctx.params.id);
   if (!content) {
     ctx.response.body = { status: null };
     ctx.status = 404;

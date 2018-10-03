@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const User = mongoose.model('User');
 const Track = mongoose.model('Track');
 const getAudioFeatures = require('../services/spotify/getAudioFeatures');
-const { pick } = require('../lib/utils');
+const { pick, defaults } = require('../lib/utils');
 
 const playlistModel = {
   create,
@@ -22,54 +22,52 @@ const playlistModel = {
 module.exports = playlistModel;
 
 // Create a playlist on Redis. Returns new playlist id
-async function create(newPlaylist, features) {
+function create(playlistInfo, features) {
   const playlistId = uuid.generate();
   const trackId = uuid.generate();
   const bankId = uuid.generate();
   const collabId = uuid.generate();
-  let playlist = {
-    admin: newPlaylist.admin,
-    name: newPlaylist.name,
+  let newPlaylist = {
+    admin: playlistInfo.admin,
+    name: playlistInfo.name,
     tracks: trackId,
     bank: bankId,
     collabs: collabId,
     ...features
   };
-  await redis.hmset(`playlist:${playlistId}`, playlist);
-  await redis.sadd(`tracks:${bankId}`, newPlaylist.tracks);
-  await redis.sadd(`collabs:${collabId}`, newPlaylist.admin);
-  await redis.sadd('recent', playlistId);
+  redis.hmset(`playlist:${playlistId}`, newPlaylist);
+  redis.sadd(`tracks:${bankId}`, playlistInfo.tracks);
+  redis.sadd(`collabs:${collabId}`, playlistInfo.admin);
+  redis.sadd('recent', playlistId);
   return playlistId;
 }
 
 // Grab a simplified version of a playlist (for display purposes)
 async function display(id) {
-  let playlist = {};
-  playlist.id = id;
-
   const details = await redis.hgetallAsync(`playlist:${id}`);
   if (!details) {
     return;
   }
+  const adminUser = await User.findOne({ username: details.admin });
+  const tracks = await redis.smembersAsync(`tracks:${details.tracks}`);
+  const fullTrackInfo = await Promise.all(tracks.map(trackId => Track.findOne({ trackId })));
+  const collabers = await redis.smembersAsync(`collabs:${details.collabs}`);
+  const fullCollabersInfo = await Promise.all(
+    collabers.map(username => User.findOne({ username }))
+  );
 
-  playlist.adminId = details.admin;
-  const user = await User.findOne({ username: playlist.adminId });
-  playlist.admin = user.name;
-  playlist.name = details.name;
-  playlist = {
-    ...playlist,
+  const playlist = {
+    id,
+    name: details.name,
+    adminId: details.adminId,
+    admin: adminUser.name,
+    length: tracks.length,
+    tracks: defaults(fullTrackInfo, []),
+    cover: extractTrackCovers(fullTrackInfo),
+    collabers: fullCollabersInfo.map(user => user.name),
     ...parsePlaylistDetails(details)
   };
-  const tracks = await redis.smembersAsync(`tracks:${details.tracks}`);
-  playlist.length = tracks.length;
-  playlist.tracks = await Promise.all(tracks.map(trackId => Track.findOne({ trackId })));
-  if (!playlist.tracks) {
-    playlist.tracks = [];
-  }
-  playlist.cover = extractTrackCovers(playlist);
-  const users = await redis.smembersAsync(`collabs:${details.collabs}`);
-  const collabers = await Promise.all(users.map(username => User.findOne({ username })));
-  playlist.collabers = collabers.map(user => user.name);
+
   return playlist;
 }
 
@@ -83,8 +81,8 @@ function parsePlaylistDetails(details) {
     major: 'Major',
     minor: 'Minor'
   };
-  return Object.keys(details).reduce((playlistDetails, [key, value]) => {
-    if (dict.hasOwnProperty(key)) {
+  return Object.entries(details).reduce((playlistDetails, [key, value]) => {
+    if (Boolean(value) && dict.hasOwnProperty(key)) {
       playlistDetails[key] = dict[key];
     } else if (key === 'mood') {
       playlistDetails.mood = value === 0 ? 'Sad' : 'Happy';
@@ -95,9 +93,9 @@ function parsePlaylistDetails(details) {
   }, {});
 }
 
-function extractTrackCovers(playlist) {
-  return playlist.tracks.length
-    ? playlist.tracks
+function extractTrackCovers(tracks) {
+  return tracks.length
+    ? tracks
         .reduce((acc, el) => {
           if (acc.length < 4) {
             acc.push({ image: el.image, popularity: el.popularity });
