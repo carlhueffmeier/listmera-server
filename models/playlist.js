@@ -4,32 +4,24 @@ const playlistUtils = require('../lib/playlistUtils');
 const mongoose = require('mongoose');
 const User = mongoose.model('User');
 const Track = mongoose.model('Track');
-const Spotify = require('./spotify');
+const spotifyService = require('../services/spotify');
 const { pick } = require('../lib/utils');
 
 const playlistModel = {
-  // create a playlist on Redis. Returns playlist id in Redis.
   create,
-  // grab a simplified version of a playlist (for display purposes only). Returns a promise that resolves to an object containing details.
   display,
-  // get all details and tracks for a specific playlist. Returns a promise that resolves to an object containing details.
   get,
-  // creates a short-lived (10 secs) cache of the collaborating users tracks and returns that cache's id.
   set,
-  // creates intersection between collaborating users tracks and playlist's tracks.
   intersect,
-  // retrieves all track ids for the specified playlist.
   getTracks,
-  // get all recently created playlists
   recent,
-  // deletes a playlist
   remove,
-  // set time at which playlist is removed
   expire
 };
 
 module.exports = playlistModel;
 
+// Create a playlist on Redis. Returns new playlist id
 async function create(newPlaylist, features) {
   const playlistId = uuid.generate();
   const trackId = uuid.generate();
@@ -50,6 +42,7 @@ async function create(newPlaylist, features) {
   return playlistId;
 }
 
+// Grab a simplified version of a playlist (for display purposes)
 async function display(id) {
   let playlist = {};
   playlist.id = id;
@@ -63,7 +56,7 @@ async function display(id) {
   playlist.admin = user.name;
   playlist.name = details.name;
   playlist = {
-    playlist,
+    ...playlist,
     ...parsePlaylistDetails(details)
   };
   const tracks = await redis.smembersAsync(`tracks:${details.tracks}`);
@@ -98,7 +91,7 @@ function parsePlaylistDetails(details) {
       playlistDetails.done = true;
     }
     return playlistDetails;
-  });
+  }, {});
 }
 
 function extractTrackCovers(playlist) {
@@ -119,6 +112,7 @@ function extractTrackCovers(playlist) {
     : undefined;
 }
 
+// Get all details and tracks for a specific playlist
 async function get(id) {
   const details = await redis.hgetallAsync(`playlist:${id}`);
   const user = await User.findOne({ spotifyId: details.admin });
@@ -146,6 +140,8 @@ async function get(id) {
   return playlist;
 }
 
+// creates a short-lived (10 secs) cache of the collaborating users tracks and
+// returns that cache's id.
 async function set(tracks) {
   const trackId = uuid.generate();
   redis.sadd(`tracks:${trackId}`, tracks);
@@ -153,12 +149,13 @@ async function set(tracks) {
   return trackId;
 }
 
+// Creates intersection between collaborating users tracks and playlist's tracks
 async function intersect(playlist, collab, collaborator, refresh) {
   const results = await redis.sismemberAsync(`collabs:${playlist.collabs}`, collaborator);
   if (!results) {
     const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
     if (intersect.length) {
-      const filtered = await Spotify.getFeatures(intersect, refresh);
+      const filtered = await spotifyService.getFeatures(intersect, refresh);
       const matched = playlistUtils.getMatchingTrackIds(filtered.body.audio_features, playlist);
       redis.sadd(`tracks:${playlist.tracks}`, matched);
     }
@@ -170,10 +167,12 @@ async function intersect(playlist, collab, collaborator, refresh) {
   }
 }
 
+// Retrieves all track ids for the specified playlist
 async function getTracks(id) {
   return redis.hgetall(`playlist:${id}`);
 }
 
+// Get all recently created playlists
 async function recent() {
   const reply = await redis.smembersAsync('recent');
   if (!reply.length) {
@@ -192,6 +191,7 @@ async function recent() {
   return { playlists };
 }
 
+// Deletes a playlist and all related data
 async function remove(playlist) {
   redis.del(`playlist:${playlist.playlist}`);
   redis.del(`tracks:${playlist.bank}`);
@@ -201,6 +201,7 @@ async function remove(playlist) {
   return 'done';
 }
 
+// Set time at which playlist is removed
 async function expire(playlist) {
   redis.hmset(`playlist:${playlist.playlist}`, { done: 1 });
   redis.expireat(`playlist:${playlist.playlist}`, parseInt(+new Date() / 1000) + 3600);

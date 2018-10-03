@@ -1,7 +1,7 @@
-// 👺 === Initialize Redis ===
+// 👺 ~~~ Initialize Redis ~~~
 require('./redis');
 
-// 🐉 === Initialize Mongoose ===
+// 🐉 ~~~ Initialize Mongoose ~~~
 const mongoose = require('mongoose');
 
 // Establish connection

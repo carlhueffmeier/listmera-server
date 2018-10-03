@@ -5,10 +5,7 @@ client.on('error', err => {
   console.error(err);
 });
 
-client.on('connect', () => {
-  console.log('REDIS LIVE');
-});
-
+// Add promisified versions for some of the methods we use
 const asyncMethods = {
   hgetallAsync: promisify(client.hgetall).bind(client),
   smembersAsync: promisify(client.smembers).bind(client),

@@ -1,6 +1,6 @@
-const spotify = require('../../secrets/spotifyConf.js');
-const User = require('../user');
-const Playlist = require('../playlist');
+const spotifyApi = require('./spotifyApi');
+const User = require('../../models/user');
+const Playlist = require('../../models/playlist');
 
 // Converts a Spotify Track ID to a Spotify Track URI
 function createTrackUri(trackId) {
@@ -8,12 +8,12 @@ function createTrackUri(trackId) {
 }
 
 async function resetSpotifyAccessToken(refresh) {
-  await spotify.setRefreshToken(refresh);
-  const data = await spotify.refreshAccessToken();
-  spotify.setAccessToken(data.body['access_token']);
+  await spotifyApi.setRefreshToken(refresh);
+  const data = await spotifyApi.refreshAccessToken();
+  spotifyApi.setAccessToken(data.body['access_token']);
 }
 
-async function generatePlaylistCopy({ playlist, refresh, copier }) {
+async function createPlaylistCopy({ playlist, refresh, copier }) {
   let trackUris = playlist.tracks.map(createTrackUri);
   await resetSpotifyAccessToken(refresh);
 
@@ -25,12 +25,12 @@ async function generatePlaylistCopy({ playlist, refresh, copier }) {
     playlist.name,
     { description: 'powered by listmera' }
   ];
-  const result = await spotify.createPlaylist(...createPlaylistOptions);
+  const result = await spotifyApi.createPlaylist(...createPlaylistOptions);
   const copiedPlaylistId = result.body.id;
-  await spotify.addTracksToPlaylist(copier.username, copiedPlaylistId, trackUris);
+  await spotifyApi.addTracksToPlaylist(copier.username, copiedPlaylistId, trackUris);
 }
 
-async function generatePlaylist({ playlist, refresh, id }) {
+async function createNewPlaylist({ playlist, refresh, id }) {
   let trackUris = playlist.tracks.map(createTrackUri);
   await resetSpotifyAccessToken(refresh);
 
@@ -42,9 +42,9 @@ async function generatePlaylist({ playlist, refresh, id }) {
     playlist.name,
     { description: 'powered by listmera' }
   ];
-  const result = await spotify.createPlaylist(...createPlaylistOptions);
+  const result = await spotifyApi.createPlaylist(...createPlaylistOptions);
   const newPlaylistId = result.body.id;
-  await spotify.addTracksToPlaylist(playlist.adminId, newPlaylistId, trackUris);
+  await spotifyApi.addTracksToPlaylist(playlist.adminId, newPlaylistId, trackUris);
   await User.removeAdmin({
     username: playlist.adminId,
     id
@@ -65,7 +65,7 @@ async function getTrackRecommendations(playlist, seedTracks) {
     seedTracks = seedTracks.slice(0, 5);
   }
   const attributes = generateAttributes(playlist, seedTracks);
-  const response = await spotify.getRecommendations(attributes);
+  const response = await spotifyApi.getRecommendations(attributes);
   const recommendedTracks = response.body.tracks.map(track => createTrackUri(track.id));
   return recommendedTracks;
 }
@@ -116,12 +116,12 @@ function generateAttributes(playlist, seedTracks) {
   }
 }
 
-function compatGeneratePlaylist(playlist, refresh, id, copy, copier) {
-  if (copy) {
-    return generatePlaylistCopy({ playlist, refresh, copier });
+function createPlaylist({ playlist, refresh, id, copier } = {}) {
+  if (copier) {
+    return createPlaylistCopy({ playlist, refresh, copier });
   } else {
-    return generatePlaylist({ playlist, refresh, id });
+    return createNewPlaylist({ playlist, refresh, id });
   }
 }
 
-module.exports = compatGeneratePlaylist;
+module.exports = createPlaylist;

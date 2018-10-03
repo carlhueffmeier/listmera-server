@@ -1,17 +1,17 @@
-const spotify = require('../../secrets/spotifyConf.js');
+const spotifyApi = require('./spotifyApi');
 const { defaults } = require('../../lib/utils');
-const User = require('../user');
+const User = require('../../models/user');
 
-async function spotifyRegister(code) {
+async function registerNewUser(code) {
   const newUser = {};
-  const authResponse = await spotify.authorizationCodeGrant(code);
+  const authResponse = await spotifyApi.authorizationCodeGrant(code);
   const { access_token, refresh_token } = authResponse.body;
-  await spotify.setAccessToken(access_token);
-  await spotify.setRefreshToken(refresh_token);
+  await spotifyApi.setAccessToken(access_token);
+  await spotifyApi.setRefreshToken(refresh_token);
   newUser.token = access_token;
   newUser.refresh = refresh_token;
-  const { body: userDetails } = await spotify.getMe();
-  const userExists = await User.findOne(userDetails.id);
+  const { body: userDetails } = await spotifyApi.getMe();
+  const userExists = await User.findById(userDetails.id);
   if (userDetails.images[0]) {
     newUser.picture = userDetails.images[0].url;
   }
@@ -20,7 +20,7 @@ async function spotifyRegister(code) {
   newUser.name = userDetails.display_name || userDetails.id;
 
   if (userExists) {
-    return User.findOne(userDetails.id);
+    return User.findById(userDetails.id);
   } else {
     newUser.playlists = await getUserPlaylists(userDetails.id);
     return User.register(newUser);
@@ -28,7 +28,7 @@ async function spotifyRegister(code) {
 }
 
 async function getUserPlaylists(spotifyUserId) {
-  const userPlaylistResult = await spotify.getUserPlaylists(spotifyUserId, { limit: 50 });
+  const userPlaylistResult = await spotifyApi.getUserPlaylists(spotifyUserId, { limit: 50 });
   const partialPlaylists = userPlaylistResult.body.items;
   return Promise.all(
     partialPlaylists.map(playlist => populatePlaylistWithTracks(spotifyUserId, playlist))
@@ -36,7 +36,7 @@ async function getUserPlaylists(spotifyUserId) {
 }
 
 async function populatePlaylistWithTracks(spotifyUserId, playlist) {
-  const playlistTracksResult = await spotify.getPlaylistTracks(spotifyUserId, playlist.id);
+  const playlistTracksResult = await spotifyApi.getPlaylistTracks(spotifyUserId, playlist.id);
   const tracks = playlistTracksResult.body.items.map(formatPlaylistTrack);
   return { id: playlist.id, name: playlist.name, tracks };
 }
@@ -61,4 +61,4 @@ function formatPlaylistTrack(playlistTrack) {
   }
 }
 
-module.exports = spotifyRegister;
+module.exports = registerNewUser;

@@ -10,6 +10,7 @@ const app = new Koa();
 const router = require('./router.js');
 const bodyParser = require('koa-body-parser');
 const cors = require('koa-cors');
+const authMiddleware = require('./middlewares/authMiddleware');
 
 const options = {
   origin: process.env.CLIENT_URL
@@ -18,6 +19,7 @@ const options = {
 app
   .use(bodyParser())
   .use(cors(options))
+  .use(authMiddleware())
   .use(router.routes())
   .use(router.allowedMethods());
 
