@@ -47,7 +47,7 @@ async function generatePlaylist(ctx) {
   const user = ctx.user;
   const playlist = await Playlist.get(ctx.params.id);
   const copy = ctx.request.body.copy;
-  if (user.length && user.username === playlist.adminId) {
+  if (user.username === playlist.adminId) {
     await spotifyService.createPlaylist({ playlist, refresh: user.refresh, id: ctx.params.id });
     ctx.status = 201;
   } else if (!playlist.adminId) {
@@ -63,7 +63,7 @@ async function deletePlaylist(ctx) {
   const user = ctx.user;
   const playlistId = ctx.params.id;
   const playlist = await Playlist.get(playlistId);
-  if (user.length && user.username === playlist.adminId) {
+  if (user.username === playlist.adminId) {
     await Playlist.remove({
       playlist: playlistId,
       collabs: playlist.collabs,

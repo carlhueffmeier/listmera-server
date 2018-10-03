@@ -35,7 +35,8 @@ async function createNewPlaylist({ playlist, refresh, id }) {
   await resetSpotifyAccessToken(refresh);
 
   if (!playlist.strict) {
-    trackUris = [...trackUris, await getTrackRecommendations(playlist, playlist.tracks)];
+    const trackRecommendations = await getTrackRecommendations(playlist, playlist.tracks);
+    trackUris = [...trackUris, ...trackRecommendations];
   }
   const createPlaylistOptions = [
     playlist.adminId,
