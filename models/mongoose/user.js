@@ -29,6 +29,7 @@ const userSchema = new mongoose.Schema({
     required: 'User needs an email address'
   },
   playlists: [playlistSchema],
+  picture: String,
   refresh: String,
   token: String,
   adminOf: {

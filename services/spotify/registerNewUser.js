@@ -43,14 +43,18 @@ async function populatePlaylistWithTracks(spotifyUserId, playlist) {
 
 function formatPlaylistTrack(playlistTrack) {
   const { track } = playlistTrack;
+  let image;
+  if (track.album.images && track.album.images.length > 0) {
+    image = track.album.images[0].url;
+  }
   return {
     id: track.id,
     name: defaults(track.name, 'Unknown'),
     mature: defaults(track.explicit, false),
     popularity: defaults(track.popularity, 0),
     artists: getArtistName(track),
-    image: track.album.images[0].url,
-    album: defaults(track.album.name, 'Unknown')
+    album: defaults(track.album.name, 'Unknown'),
+    image
   };
 
   function getArtistName(track) {
