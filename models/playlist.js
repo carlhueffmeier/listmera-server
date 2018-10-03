@@ -183,7 +183,7 @@ async function recent() {
       playlist.tracks.length > 0
         ? {
             ...playlist,
-            cover: extractTrackCovers(playlist)
+            cover: extractTrackCovers(playlist.tracks)
           }
         : playlist
   );
