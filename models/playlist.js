@@ -55,7 +55,6 @@ async function display(id) {
   const fullCollabersInfo = await Promise.all(
     collabers.map(username => User.findOne({ username }))
   );
-
   const playlist = {
     id,
     name: details.name,
@@ -63,16 +62,15 @@ async function display(id) {
     admin: adminUser.name,
     length: tracks.length,
     tracks: defaults(fullTrackInfo, []),
-    cover: extractTrackCovers(fullTrackInfo),
+    cover: getPopularTrackCovers(fullTrackInfo),
     collabers: fullCollabersInfo.map(user => user.name),
     ...parsePlaylistDetails(details)
   };
-
   return playlist;
 }
 
 function parsePlaylistDetails(details) {
-  const dict = {
+  const displayValues = {
     dance: 'Dance',
     energy: 'Energetic',
     loud: 'Loud',
@@ -82,8 +80,8 @@ function parsePlaylistDetails(details) {
     minor: 'Minor'
   };
   return Object.entries(details).reduce((playlistDetails, [key, value]) => {
-    if (Boolean(value) && dict.hasOwnProperty(key)) {
-      playlistDetails[key] = dict[key];
+    if (Boolean(value) && displayValues.hasOwnProperty(key)) {
+      playlistDetails[key] = displayValues[key];
     } else if (key === 'mood') {
       playlistDetails.mood = value === 0 ? 'Sad' : 'Happy';
     } else if (key === 'done') {
@@ -93,22 +91,14 @@ function parsePlaylistDetails(details) {
   }, {});
 }
 
-function extractTrackCovers(tracks) {
-  return tracks.length
-    ? tracks
-        .reduce((acc, el) => {
-          if (acc.length < 4) {
-            acc.push({ image: el.image, popularity: el.popularity });
-            return acc.sort((a, b) => b.popularity - a.popularity);
-          } else if (el.popularity > acc[3].popularity) {
-            acc = [...acc.slice(0, 3), { image: el.image, popularity: el.popularity }];
-            return acc.sort((a, b) => b.popularity - a.popularity);
-          } else {
-            return acc;
-          }
-        }, [])
-        .map(el => el.image)
-    : undefined;
+// Returns the album covers of the 4 most popular tracks
+function getPopularTrackCovers(tracks, limit = 4) {
+  if (tracks.length > 0) {
+    return [...tracks]
+      .sort((a, b) => b.popularity - a.popularity)
+      .slice(0, limit)
+      .map(track => track.image);
+  }
 }
 
 // Get all details and tracks for a specific playlist
@@ -150,20 +140,24 @@ async function set(trackIds) {
 
 // Creates intersection between collaborating users tracks and playlist's tracks
 async function intersect(playlist, collab, collaborator, refresh) {
-  const results = await redis.sismemberAsync(`collabs:${playlist.collabs}`, collaborator);
-  if (!results) {
-    const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
-    if (intersect.length) {
-      const audioFeatures = await getAudioFeatures(intersect, refresh);
-      const matched = playlistUtils.getMatchingTrackIds(audioFeatures, playlist);
-      redis.sadd(`tracks:${playlist.tracks}`, matched);
-    }
-    const diff = await redis.sdiffAsync(`tracks:${collab}`, `tracks:${playlist.bank}`);
-    if (diff.length) {
-      redis.sadd(`tracks:${playlist.bank}`, diff);
-    }
-    redis.sadd(`collabs:${playlist.collabs}`, collaborator);
+  if (await isCollaborating(collaborator, playlist)) {
+    return;
   }
+  const intersect = await redis.SINTERAsync(`tracks:${playlist.bank}`, `tracks:${collab}`);
+  if (intersect.length) {
+    const audioFeatures = await getAudioFeatures(intersect, refresh);
+    const matched = playlistUtils.getMatchingTrackIds(audioFeatures, playlist);
+    redis.sadd(`tracks:${playlist.tracks}`, matched);
+  }
+  const diff = await redis.sdiffAsync(`tracks:${collab}`, `tracks:${playlist.bank}`);
+  if (diff.length > 0) {
+    redis.sadd(`tracks:${playlist.bank}`, diff);
+  }
+  redis.sadd(`collabs:${playlist.collabs}`, collaborator);
+}
+
+function isCollaborating(collaborator, playlist) {
+  return redis.sismemberAsync(`collabs:${playlist.collabs}`, collaborator);
 }
 
 // Retrieves all track ids for the specified playlist
@@ -173,17 +167,17 @@ async function getTracks(id) {
 
 // Get all recently created playlists
 async function recent() {
-  const reply = await redis.smembersAsync('recent');
-  if (!reply.length) {
+  const result = await redis.smembersAsync('recent');
+  if (!result.length) {
     return { playlists: [] };
   }
-  let playlists = await Promise.all(reply.map(el => display(el)));
+  let playlists = await Promise.all(result.map(el => display(el)));
   playlists = playlists.map(
     playlist =>
       playlist.tracks.length > 0
         ? {
             ...playlist,
-            cover: extractTrackCovers(playlist.tracks)
+            cover: getPopularTrackCovers(playlist.tracks)
           }
         : playlist
   );
@@ -201,7 +195,7 @@ async function remove(playlist) {
 }
 
 // Set time at which playlist is removed
-async function expire(playlist) {
+function expire(playlist) {
   redis.hmset(`playlist:${playlist.playlist}`, { done: 1 });
   redis.expireat(`playlist:${playlist.playlist}`, parseInt(+new Date() / 1000) + 3600);
   redis.expireat(`tracks:${playlist.bank}`, parseInt(+new Date() / 1000) + 3600);

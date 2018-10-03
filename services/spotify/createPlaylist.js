@@ -23,7 +23,7 @@ async function createPlaylistCopy({ playlist, refresh, copier }) {
   const createPlaylistOptions = [
     copier.username,
     playlist.name,
-    { description: 'powered by listmera' }
+    { description: 'powered by Listmera' }
   ];
   const result = await spotifyApi.createPlaylist(...createPlaylistOptions);
   const copiedPlaylistId = result.body.id;
@@ -41,7 +41,7 @@ async function createNewPlaylist({ playlist, refresh, id }) {
   const createPlaylistOptions = [
     playlist.adminId,
     playlist.name || 'Listmera Playlist 🕺 💃',
-    { description: 'powered by listmera' }
+    { description: 'powered by Listmera' }
   ];
   const result = await spotifyApi.createPlaylist(...createPlaylistOptions);
   const newPlaylistId = result.body.id;
