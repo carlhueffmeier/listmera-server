@@ -1,97 +1,95 @@
-const engine = require('../engine/engine.js');
+const spotifyService = require('../services/spotify');
+const User = require('../models/user');
+const Playlist = require('../models/playlist');
+const playlistUtils = require('../lib/playlistUtils');
 
-//locate a specific User and return it's details.
-const locate = require('../models/userModels/findUser.js');
-//set a user as the admin user of a specific playlist. Processing function, returns 201 to show it worked correctly.
-const setAsManager = require('../models/userModels/userPlaylistModel.js');
-//removes a user as the manager for a playlist
-const removeAdmin = require('../models/userModels/removeAdmin.js');
+async function createNewPlaylist(ctx) {
+  const body = ctx.request.body;
+  const user = ctx.user;
+  const parsedFeatures = playlistUtils.parseFeatureSpecs(body.values, body.tempo);
+  const trackList = playlistUtils.getAllTracks(user.playlists);
+  const newPlaylistId = await Playlist.create(
+    {
+      admin: body.username,
+      name: body.name,
+      tracks: trackList
+    },
+    parsedFeatures
+  );
+  await User.addAdmin({ id: newPlaylistId, username: body.username });
+  ctx.status = 201;
+  ctx.response.body = { id: newPlaylistId };
+}
 
-//push a playlist in Redis to a users spotify account.
-const generate = require('../models/spotifyModels/createPlaylist.js');
-
-//create a playlist on Redis. Returns playlist id in Redis.
-const create = require('../models/playlistModels/createPlaylist.js');
-//grab a simplified version of a playlist (for display purposes only). Returns a promise that resolves to an object containing details.
-const display = require('../models/playlistModels/getDisplayPlaylist.js');
-//get all details and tracks for a specific playlist. Returns a promise that resolves to an object containing details.
-const get = require('../models/playlistModels/getPlaylistDetails.js');
-//creates a short-lived (10 secs) cache of the collaborating users tracks and returns that cache's id.
-const set = require('../models/playlistModels/createTrackList.js');
-//creates intersection between collaborating users tracks and playlist's tracks. Returns 200 to show it worked correctly.
-const intersect = require('../models/playlistModels/intersectTracks.js');
-//retrieves all track ids for the specified playlist.
-const getTracks = require('../models/playlistModels/retrieveTrackList.js');
-//get all recently created playlists
-const recent = require('../models/playlistModels/recentPlaylists.js');
-//deletes a playlist
-const remove = require('../models/playlistModels/deletePlaylist.js');
-
-module.exports = {
-  create: async function (ctx) {
-    const req = JSON.parse(ctx.request.body);
-    const parsed = engine.parse(req.values, req.tempo)
-    const user = await locate(req.username);
-    const trackList = engine.init(user[0].playlists);
-    const newPlaylist = await create({
-      admin : req.username,
-      name : req.name,
-      tracks : trackList,
-    }, parsed);
-    ctx.status = await setAsManager({id: newPlaylist, username: req.username})
-    ctx.response.body = {id : newPlaylist};
-  },
-  get: async function (ctx) {
-    const content = await display(ctx.params.id)
-      .catch(e => e);
-    if (!content) {
-      ctx.response.body = {status: null};
-      ctx.status = 404;
-    } else {
-      ctx.response.body = content;
-      ctx.status = 200;
-    }
-  },
-  collab: async function (ctx) {
-    const user = await locate(JSON.parse(ctx.request.body).username);
-    const tracks = engine.init(user[0].playlists);
-    const trackId = await set(tracks);
-    const playlist = await getTracks(ctx.params.id);
-    ctx.status = await intersect(playlist, trackId, user[0].username, user[0].refresh)
-      .catch(e => console.error(e));
-  },
-  generate: async function (ctx) {
-    const user = await locate(JSON.parse(ctx.request.body).username);
-    const playlist = await get(ctx.params.id);
-    const copy = JSON.parse(ctx.request.body).copy
-    if (user.length && user[0].username === playlist.adminId) {
-      await generate(playlist, user[0].refresh, ctx.params.id)
-      ctx.status = 201;
-    } else if (!playlist.adminId) {
-      ctx.status = 400;
-    } else if (copy) {
-      await generate(playlist, user[0].refresh, ctx.params.id, copy, user[0])
-    } else ctx.status = 401;
-  },
-  delete: async function (ctx) {
-    const playlist = await get(ctx.params.id);
-    const user = await locate(JSON.parse(ctx.request.body).username);
-    if (user.length && user[0].username === playlist.adminId) {
-      await remove({
-        playlist: ctx.params.id,
-        collabs: playlist.collabs,
-        bank: playlist.bank,
-        tracks: playlist.trackId
-      });
-      ctx.status = await removeAdmin({
-        username: user[0].username,
-        id: ctx.params.id
-      });
-    } else if (!playlist.adminId) ctx.status = 400;
-    else ctx.status = 401;
-  },
-  recent: async function (ctx) {
-    ctx.response.body = await recent();
+async function getPlaylist(ctx) {
+  const content = await Playlist.display(ctx.params.id);
+  if (!content) {
+    ctx.response.body = { status: null };
+    ctx.status = 404;
+  } else {
+    ctx.response.body = content;
     ctx.status = 200;
   }
-};
+}
+
+async function collaborateOnPlaylist(ctx) {
+  const user = ctx.user;
+  const userTracks = playlistUtils.getAllTracks(user.playlists);
+  // Creating a short lived cache of user track ids
+  const cacheId = await Playlist.set(userTracks);
+  // Getting all tracks from playlist user wants to collaborate with
+  const playlist = await Playlist.getTracks(ctx.params.id);
+  await Playlist.intersect(playlist, cacheId, user.username, user.refresh);
+  ctx.status = 200;
+}
+
+async function generatePlaylist(ctx) {
+  const user = ctx.user;
+  const playlist = await Playlist.get(ctx.params.id);
+  const copy = ctx.request.body.copy;
+  if (user.username === playlist.adminId) {
+    await spotifyService.createPlaylist({ playlist, refresh: user.refresh, id: ctx.params.id });
+    ctx.status = 201;
+  } else if (!playlist.adminId) {
+    ctx.status = 400;
+  } else if (copy) {
+    await spotifyService.createPlaylist({ playlist, refresh: user.refresh, copier: user });
+  } else {
+    ctx.status = 401;
+  }
+}
+
+async function deletePlaylist(ctx) {
+  const user = ctx.user;
+  const playlistId = ctx.params.id;
+  const playlist = await Playlist.get(playlistId);
+  if (user.username === playlist.adminId) {
+    await Playlist.remove({
+      playlist: playlistId,
+      collabs: playlist.collabs,
+      bank: playlist.bank,
+      tracks: playlist.trackId
+    });
+    await User.removeAdmin({
+      username: user.username,
+      id: playlistId
+    });
+    ctx.status = 202;
+  } else if (!playlist.adminId) {
+    ctx.status = 400;
+  } else {
+    ctx.status = 401;
+  }
+}
+
+async function getRecentPlaylists(ctx) {
+  ctx.response.body = await Playlist.recent();
+  ctx.status = 200;
+}
+
+exports.create = createNewPlaylist;
+exports.get = getPlaylist;
+exports.collab = collaborateOnPlaylist;
+exports.generate = generatePlaylist;
+exports.delete = deletePlaylist;
+exports.recent = getRecentPlaylists;

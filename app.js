@@ -1,18 +1,27 @@
+// Load environment configuration 🌳
+require('dotenv').config();
+
+// Initialize Models 🚀
+require('./models/initializeModels');
+
+// Configure server 🛠
 const Koa = require('koa');
 const app = new Koa();
-const serve = require('koa-static');
 const router = require('./router.js');
 const bodyParser = require('koa-body-parser');
 const cors = require('koa-cors');
-require('dotenv').config();
+const authMiddleware = require('./middlewares/authMiddleware');
 
 const options = {
-  origin: 'http://listmera.rocks',
-}
+  origin: process.env.CLIENT_URL
+};
 
-app.use(bodyParser())
+app
+  .use(bodyParser())
   .use(cors(options))
+  .use(authMiddleware())
   .use(router.routes())
-  .use(router.allowedMethods())
+  .use(router.allowedMethods());
 
-app.listen(process.env.PORT || 3000)
+// Start server 🔥
+app.listen(process.env.PORT);
